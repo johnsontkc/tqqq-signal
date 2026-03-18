@@ -423,24 +423,8 @@ window.addEventListener('appinstalled', () => {
 // ═══════════════════════════════════════════════════
 
 // 偵測本地代理 API 是否可用
-let LOCAL_API = null; // 將在首次請求時偵測
+let LOCAL_API = false; // 將在首次請求時偵測
 
-async function detectLocalApi() {
-    if (LOCAL_API !== null) return LOCAL_API;
-    try {
-        const ctrl = new AbortController();
-        setTimeout(() => ctrl.abort(), 3000);
-        const r = await fetch('/api/health', { signal: ctrl.signal, cache: 'no-store' });
-        if (r.ok) {
-            LOCAL_API = true;
-            console.log('✅ Local proxy API available');
-            return true;
-        }
-    } catch (e) { /* ignore */ }
-    LOCAL_API = false;
-    console.log('ℹ️ Local proxy API not available, using public proxies');
-    return false;
-}
 
 // 帶超時的 fetch
 async function fetchWithTimeout(url, timeoutMs = 12000) {
@@ -472,76 +456,49 @@ function validateYFResult(json, ticker, minPoints = 20) {
     return result;
 }
 
-// 主要數據獲取函數（帶智能重試）
 async function fetchYahoo(ticker, range) {
     const retryEl = document.getElementById('retryStatus');
-    const hasLocal = await detectLocalApi();
-
-    // ── 方案一：本地代理 API ──
-    if (hasLocal) {
-        try {
-            const r = await fetchWithTimeout(`/api/chart/${ticker}?range=${range}&interval=1d`, 12000);
-            if (r.ok) {
-                const json = await r.json();
-                const result = validateYFResult(json, ticker);
-                if (result) {
-                    console.log(`✅ ${ticker} via local API, price=${result.meta?.regularMarketPrice}`);
-                    return result;
-                }
-            }
-        } catch (e) {
-            console.warn(`Local API failed for ${ticker}:`, e.message);
-        }
-    }
-
-    // ── 方案二：公共 CORS Proxy（帶重試）──
     const YF_URLS = [
         `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=${range}&includePrePost=false`,
-        `https://query2.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=${range}&includePrePost=false`,
+        `https://query2.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=${range}&includePrePost=false`
     ];
 
-    const MAX_ATTEMPTS = 6;
-    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
-        const ts = Date.now();
-        const yUrl = YF_URLS[attempt % YF_URLS.length];
-        const enc = encodeURIComponent(yUrl);
+    const MAX_ATTEMPTS = 8;
+    const proxyList = [
+        `https://api.allorigins.win/raw?url=`,
+        `https://api.codetabs.com/v1/proxy/?quest=`,
+        `https://corsproxy.io/?`,
+        `https://api.allorigins.win/get?url=`,  // 新增變體
+        `https://cors-anywhere.herokuapp.com/`, // 備用
+        `https://thingproxy.freeboard.io/fetch/`,
+        `https://proxy.cors.sh/`,
+        `https://crossorigin.me/`
+    ];
 
-        // 輪流使用不同 proxy 策略
-        const proxyStrategies = [
-            `https://api.allorigins.win/raw?url=${enc}`,
-            `https://api.allorigins.win/raw?url=${enc}&_=${ts}`,
-            `https://api.codetabs.com/v1/proxy/?quest=${enc}`,
-            `https://api.allorigins.win/raw?url=${encodeURIComponent(yUrl + '&_=' + ts)}`,
-            `https://api.allorigins.win/raw?url=${enc}&cb=${ts}`,
-            `https://api.codetabs.com/v1/proxy/?quest=${encodeURIComponent(yUrl + '&t=' + ts)}`,
-        ];
-        const proxyUrl = proxyStrategies[attempt];
+    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+        const yUrl = YF_URLS[attempt % 2];
+        const proxyBase = proxyList[attempt % proxyList.length];
+        const proxyUrl = proxyBase + encodeURIComponent(yUrl + `&_t=${Date.now()}`);
 
         try {
             if (attempt > 0) {
                 retryEl.className = 'retry-status show';
                 retryEl.textContent = `🔄 第 ${attempt + 1} 次嘗試（${ticker}）...`;
-                await new Promise(r => setTimeout(r, Math.min(800 * attempt, 3000)));
+                await new Promise(r => setTimeout(r, 600));
             }
 
-            const resp = await fetchWithTimeout(proxyUrl, 12000);
-            if (!resp.ok) { console.warn(`Attempt ${attempt + 1} HTTP ${resp.status}`); continue; }
+            const resp = await fetchWithTimeout(proxyUrl, 10000);
+            if (!resp.ok) continue;
 
             const text = await resp.text();
-            if (!text || text.length < 50) { console.warn(`Attempt ${attempt + 1} empty response`); continue; }
-
-            let json;
-            try { json = JSON.parse(text); } catch (e) { console.warn(`Attempt ${attempt + 1} JSON parse fail`); continue; }
-
+            let json = JSON.parse(text);
             const result = validateYFResult(json, ticker);
             if (result) {
                 retryEl.className = 'retry-status';
-                console.log(`✅ ${ticker} via proxy attempt ${attempt + 1}, price=${result.meta?.regularMarketPrice}`);
+                console.log(`✅ ${ticker} via proxy #${attempt+1}`);
                 return result;
             }
-        } catch (e) {
-            console.warn(`Attempt ${attempt + 1} failed for ${ticker}:`, e.message || e);
-        }
+        } catch (e) {}
     }
 
     retryEl.className = 'retry-status';
