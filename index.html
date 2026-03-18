@@ -457,52 +457,9 @@ function validateYFResult(json, ticker, minPoints = 20) {
 }
 
 async function fetchYahoo(ticker, range) {
-    const retryEl = document.getElementById('retryStatus');
-    const YF_URLS = [
-        `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=${range}&includePrePost=false`,
-        `https://query2.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=${range}&includePrePost=false`
-    ];
-
-    const MAX_ATTEMPTS = 8;
-    const proxyList = [
-        `https://api.allorigins.win/raw?url=`,
-        `https://api.codetabs.com/v1/proxy/?quest=`,
-        `https://corsproxy.io/?`,
-        `https://api.allorigins.win/get?url=`,  // 新增變體
-        `https://cors-anywhere.herokuapp.com/`, // 備用
-        `https://thingproxy.freeboard.io/fetch/`,
-        `https://proxy.cors.sh/`,
-        `https://crossorigin.me/`
-    ];
-
-    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
-        const yUrl = YF_URLS[attempt % 2];
-        const proxyBase = proxyList[attempt % proxyList.length];
-        const proxyUrl = proxyBase + encodeURIComponent(yUrl + `&_t=${Date.now()}`);
-
-        try {
-            if (attempt > 0) {
-                retryEl.className = 'retry-status show';
-                retryEl.textContent = `🔄 第 ${attempt + 1} 次嘗試（${ticker}）...`;
-                await new Promise(r => setTimeout(r, 600));
-            }
-
-            const resp = await fetchWithTimeout(proxyUrl, 10000);
-            if (!resp.ok) continue;
-
-            const text = await resp.text();
-            let json = JSON.parse(text);
-            const result = validateYFResult(json, ticker);
-            if (result) {
-                retryEl.className = 'retry-status';
-                console.log(`✅ ${ticker} via proxy #${attempt+1}`);
-                return result;
-            }
-        } catch (e) {}
-    }
-
-    retryEl.className = 'retry-status';
-    return null;
+    const proxyUrl = `/.netlify/functions/yahoo-proxy?ticker=${ticker}&range=${range}`;
+    const resp = await fetchWithTimeout(proxyUrl, 10000);
+    
 }
 
 // ── Technical Indicators ──
