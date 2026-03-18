@@ -1,0 +1,791 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#0f172a">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="TQQQ Signal">
+    <link rel="manifest" href="manifest.json">
+    <title>TQQQ 買入訊號監測器</title>
+    <style>
+        /* ── Design Tokens ── */
+        :root {
+            --bg: #0f172a;
+            --bg2: #1e293b;
+            --bg3: #334155;
+            --card: #1e293b;
+            --border: #334155;
+            --border2: #475569;
+            --green: #22c55e;
+            --green2: #16a34a;
+            --green3: #4ade80;
+            --greenBg: rgba(34,197,94,.12);
+            --greenBorder: rgba(34,197,94,.30);
+            --red: #f87171;
+            --redBg: rgba(248,113,113,.12);
+            --amber: #fbbf24;
+            --amberBg: rgba(251,191,36,.12);
+            --blue: #60a5fa;
+            --blueBg: rgba(96,165,250,.12);
+            --txt: #f1f5f9;
+            --txt2: #94a3b8;
+            --txt3: #64748b;
+            --radius: 16px;
+            --radius-sm: 10px;
+            --radius-xs: 7px;
+        }
+
+        /* ── Reset & Base ── */
+        *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+        html { font-size: 16px; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--txt);
+            min-height: 100vh;
+            padding: 16px 14px;
+            padding-bottom: calc(env(safe-area-inset-bottom, 20px) + 16px);
+            -webkit-font-smoothing: antialiased;
+        }
+        .wrap { max-width: 520px; margin: 0 auto; }
+
+        /* ── Header ── */
+        .hdr {
+            background: linear-gradient(135deg, #1a3a5c 0%, #162d47 50%, #0f2035 100%);
+            border: 1px solid rgba(96,165,250,.18);
+            border-radius: var(--radius);
+            padding: 22px 20px 18px;
+            text-align: center;
+            margin-bottom: 14px;
+            position: relative;
+            overflow: hidden;
+        }
+        .hdr::before {
+            content: '';
+            position: absolute;
+            top: -50px; left: -50px;
+            width: 180px; height: 180px;
+            background: radial-gradient(circle, rgba(34,197,94,.12) 0%, transparent 70%);
+            pointer-events: none;
+        }
+        .hdr::after {
+            content: '';
+            position: absolute;
+            bottom: -40px; right: -40px;
+            width: 150px; height: 150px;
+            background: radial-gradient(circle, rgba(96,165,250,.10) 0%, transparent 70%);
+            pointer-events: none;
+        }
+        .hdr-icon { font-size: 34px; line-height: 1; margin-bottom: 8px; display: block; }
+        .hdr h1 {
+            font-size: 19px; font-weight: 800; letter-spacing: -.3px; margin-bottom: 5px;
+            background: linear-gradient(135deg, #fff 0%, #93c5fd 100%);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+        }
+        .hdr p { font-size: 11.5px; color: var(--txt2); line-height: 1.5; }
+        .hdr-badge {
+            display: inline-flex; align-items: center; gap: 5px;
+            background: rgba(34,197,94,.15); border: 1px solid rgba(34,197,94,.25);
+            color: var(--green3); font-size: 10px; font-weight: 600;
+            padding: 3px 9px; border-radius: 20px; margin-top: 8px; letter-spacing: .3px;
+        }
+        .hdr-badge::before { content: '●'; font-size: 7px; animation: pulse-dot 2s ease-in-out infinite; }
+        @keyframes pulse-dot { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+        /* ── Install Banner ── */
+        #installBanner {
+            display: none; background: var(--card); border: 1px solid var(--greenBorder);
+            border-radius: var(--radius-sm); padding: 13px 15px; margin-bottom: 14px;
+            align-items: center; gap: 12px;
+        }
+        #installBanner.show { display: flex; }
+        #installBanner span { flex: 1; font-size: 13px; color: var(--txt2); line-height: 1.4; }
+        .btn-install {
+            background: var(--green2); color: #fff; border: none;
+            padding: 9px 16px; border-radius: var(--radius-xs);
+            font-size: 13px; font-weight: 700; cursor: pointer; white-space: nowrap;
+        }
+
+        /* ── Error / Warning / Info ── */
+        .err {
+            background: var(--redBg); border: 1px solid rgba(248,113,113,.30);
+            color: #fca5a5; padding: 13px 15px; border-radius: var(--radius-sm);
+            font-size: 12.5px; margin-bottom: 14px; display: none; line-height: 1.65;
+        }
+        .warn-note {
+            background: var(--amberBg); border: 1px solid rgba(251,191,36,.25);
+            color: #fcd34d; padding: 10px 14px; border-radius: var(--radius-sm);
+            font-size: 11.5px; margin-bottom: 14px; line-height: 1.6;
+        }
+        .retry-status {
+            background: var(--blueBg); border: 1px solid rgba(96,165,250,.20);
+            color: var(--blue); padding: 10px 14px; border-radius: var(--radius-sm);
+            font-size: 12px; margin-bottom: 10px; display: none; line-height: 1.6;
+        }
+        .retry-status.show { display: block; }
+
+        /* ── Status Grid ── */
+        .srow { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+        .scard {
+            background: var(--card); border: 1px solid var(--border);
+            border-radius: var(--radius-sm); padding: 14px 12px; text-align: center;
+            transition: border-color .3s; position: relative; overflow: hidden;
+        }
+        .scard::before {
+            content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+            background: linear-gradient(90deg, transparent, var(--border), transparent);
+            transition: background .3s;
+        }
+        .scard.active::before { background: linear-gradient(90deg, transparent, var(--green), transparent); }
+        .scard h3 { font-size: 9.5px; color: var(--txt3); text-transform: uppercase; letter-spacing: .8px; font-weight: 600; margin-bottom: 7px; }
+        .sval { font-size: 22px; font-weight: 800; line-height: 1; }
+        .ssub { font-size: 11px; margin-top: 4px; color: var(--txt3); font-weight: 500; }
+        .up { color: var(--green); } .dn { color: var(--red); }
+
+        /* ── Progress ── */
+        .prog-wrap { margin: 4px 0 6px; }
+        .prog { height: 4px; background: var(--bg3); border-radius: 4px; overflow: hidden; }
+        .prog-fill {
+            height: 100%; background: linear-gradient(90deg, var(--green2), var(--green3));
+            border-radius: 4px; transition: width .8s cubic-bezier(.4,0,.2,1); width: 0%;
+        }
+        .prog-lbl { font-size: 11px; color: var(--txt3); text-align: center; margin-top: 6px; margin-bottom: 12px; min-height: 16px; }
+
+        /* ── Signal Box (BUY) ── */
+        .sig-box {
+            background: linear-gradient(135deg, #14532d 0%, #166534 50%, #15803d 100%);
+            border: 1px solid rgba(34,197,94,.40); border-radius: var(--radius);
+            padding: 22px 18px; margin-bottom: 14px; display: none;
+            animation: glow-pulse 2.5s ease-in-out infinite;
+            position: relative; overflow: hidden;
+        }
+        .sig-box::before {
+            content: ''; position: absolute; top: -50%; left: -50%;
+            width: 200%; height: 200%;
+            background: radial-gradient(circle at 30% 30%, rgba(74,222,128,.08) 0%, transparent 60%);
+            pointer-events: none;
+        }
+        .sig-box.show { display: block; }
+        @keyframes glow-pulse {
+            0%,100% { box-shadow: 0 0 30px rgba(34,197,94,.20), 0 8px 32px rgba(0,0,0,.40); }
+            50% { box-shadow: 0 0 50px rgba(34,197,94,.40), 0 8px 32px rgba(0,0,0,.40); }
+        }
+        .sig-title { font-size: 17px; font-weight: 800; text-align: center; margin-bottom: 16px; color: #fff; }
+        .pgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .pit {
+            background: rgba(255,255,255,.10); border: 1px solid rgba(255,255,255,.15);
+            border-radius: var(--radius-sm); padding: 13px 10px; text-align: center;
+        }
+        .pit.stop { background: rgba(0,0,0,.25); border-color: rgba(248,113,113,.30); }
+        .pit h4 { font-size: 9.5px; opacity: .80; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px; color: #fff; }
+        .pit .pv { font-size: 23px; font-weight: 900; color: #fff; }
+        .sig-note { text-align: center; font-size: 11px; opacity: .75; margin-top: 14px; line-height: 1.6; color: #fff; }
+
+        /* ── Waiting Box ── */
+        .wait-box {
+            background: var(--card); border: 1px solid var(--border);
+            border-radius: var(--radius); padding: 22px 18px; text-align: center; margin-bottom: 14px;
+        }
+        .big-n { font-size: 56px; font-weight: 900; color: var(--green); line-height: 1; margin-bottom: 5px; letter-spacing: -2px; }
+        .big-n.warn { color: var(--amber); }
+        .big-n.zero { color: var(--txt3); }
+        .wait-sub { color: var(--txt2); font-size: 13px; margin-bottom: 14px; }
+        .badges { display: flex; flex-wrap: wrap; gap: 7px; justify-content: center; }
+        .bdg { font-size: 11px; padding: 4px 11px; border-radius: 20px; font-weight: 600; }
+        .bdg.ok { background: var(--greenBg); color: var(--green3); border: 1px solid var(--greenBorder); }
+        .bdg.no { background: var(--bg3); color: var(--txt3); border: 1px solid var(--border); }
+
+        /* ── Filter Cards ── */
+        .sec-hdr { display: flex; align-items: center; gap: 8px; margin-bottom: 11px; }
+        .sec-t { font-size: 13px; font-weight: 700; color: var(--txt2); flex: 1; }
+        .fgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+        .fc {
+            background: var(--card); border: 1px solid var(--border);
+            border-radius: var(--radius-sm); padding: 13px 12px;
+            transition: all .35s; position: relative; overflow: hidden;
+        }
+        .fc::before {
+            content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+            background: var(--border); transition: background .35s;
+        }
+        .fc.pass {
+            border-color: var(--greenBorder);
+            background: linear-gradient(135deg, rgba(34,197,94,.06) 0%, var(--card) 100%);
+        }
+        .fc.pass::before { background: linear-gradient(90deg, var(--green2), var(--green3)); }
+        .fhdr { display: flex; justify-content: space-between; align-items: center; margin-bottom: 9px; }
+        .fnm { font-size: 10.5px; font-weight: 600; color: var(--txt3); }
+        .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--bg3); transition: all .35s; flex-shrink: 0; }
+        .dot.on { background: var(--green); box-shadow: 0 0 8px var(--green); }
+        .fv { font-size: 12.5px; font-weight: 700; margin-bottom: 5px; line-height: 1.3; }
+        .fv.ok { color: var(--green3); } .fv.no { color: var(--txt3); }
+        .fd { font-size: 10px; color: var(--txt3); line-height: 1.5; }
+
+        /* ── Buttons ── */
+        .brow { display: flex; gap: 10px; margin-bottom: 14px; }
+        .btn {
+            flex: 1; background: linear-gradient(135deg, var(--green2), #15803d);
+            color: #fff; border: none; padding: 14px 10px; border-radius: var(--radius-sm);
+            font-size: 14px; font-weight: 700; cursor: pointer; transition: all .2s;
+            -webkit-appearance: none; letter-spacing: .2px;
+        }
+        .btn:active { transform: scale(.98); opacity: .85; }
+        .btn:disabled { opacity: .45; pointer-events: none; }
+        .btn.out { background: transparent; border: 1.5px solid var(--green2); color: var(--green3); }
+        .btn.out:active { background: var(--greenBg); }
+
+        /* ── Info Bar ── */
+        .info-bar {
+            background: var(--card); border: 1px solid var(--border);
+            border-radius: var(--radius-sm); padding: 12px 15px;
+            font-size: 11.5px; color: var(--txt3); line-height: 1.9;
+        }
+        .info-bar b { color: var(--txt2); font-weight: 600; }
+
+        /* ── Divider ── */
+        .divider { height: 1px; background: linear-gradient(90deg, transparent, var(--border), transparent); margin: 4px 0 14px; }
+
+        /* ── Spinner ── */
+        .spin {
+            display: inline-block; width: 13px; height: 13px;
+            border: 2px solid rgba(255,255,255,.25); border-top-color: #fff;
+            border-radius: 50%; animation: sp .65s linear infinite;
+            vertical-align: middle; margin-right: 5px;
+        }
+        @keyframes sp { to { transform: rotate(360deg); } }
+
+        /* ── Animations ── */
+        @keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+        .fade-in { animation: fadeIn .4s ease forwards; }
+    </style>
+</head>
+<body>
+<div class="wrap">
+
+    <!-- Header -->
+    <div class="hdr">
+        <span class="hdr-icon">📊</span>
+        <h1>TQQQ 買入訊號監測器</h1>
+        <p>5重過濾策略 · 每30分鐘自動更新 · 條件全達成即推送通知</p>
+        <div class="hdr-badge">LIVE 實時監測</div>
+    </div>
+
+    <!-- Install Banner -->
+    <div id="installBanner">
+        <span>📲 安裝成 App，放上主頁螢幕！</span>
+        <button class="btn-install" id="installBtn">安裝</button>
+    </div>
+
+    <!-- Error Box -->
+    <div class="err" id="errBox"></div>
+
+    <!-- Retry Status -->
+    <div class="retry-status" id="retryStatus"></div>
+
+    <!-- Data Source Note -->
+    <div class="warn-note">
+        📡 數據來源：Yahoo Finance（免費 · 無需 API Key）· 美股交易時段數據更新最快 · 休市後為上次收市價
+    </div>
+
+    <!-- Price Cards -->
+    <div class="srow">
+        <div class="scard" id="sc-tqqq">
+            <h3>TQQQ 現價</h3>
+            <div class="sval" id="tqqqPrice">--</div>
+            <div class="ssub" id="tqqqChg">-</div>
+        </div>
+        <div class="scard" id="sc-qqq">
+            <h3>QQQ 現價</h3>
+            <div class="sval" id="qqqPrice">--</div>
+            <div class="ssub" id="qqqChg">-</div>
+        </div>
+        <div class="scard" id="sc-pass">
+            <h3>條件達成</h3>
+            <div class="sval" id="passCount">--</div>
+            <div class="ssub" id="passSub">-</div>
+        </div>
+        <div class="scard" id="sc-sig">
+            <h3>整體訊號</h3>
+            <div class="sval" id="sigStatus">等待中</div>
+            <div class="ssub" id="sigSub">-</div>
+        </div>
+    </div>
+
+    <!-- Progress Bar -->
+    <div class="prog-wrap">
+        <div class="prog"><div class="prog-fill" id="pBar"></div></div>
+    </div>
+    <div class="prog-lbl" id="pLabel">按「立即檢查」開始監測</div>
+
+    <!-- Signal Box (All Pass) -->
+    <div class="sig-box" id="sigBox">
+        <div class="sig-title">🚀 買入訊號觸發！5個條件全達成！</div>
+        <div class="pgrid">
+            <div class="pit"><h4>📈 建議買入價</h4><div class="pv" id="buyP">--</div></div>
+            <div class="pit stop"><h4>⛔ 止損 (2×ATR)</h4><div class="pv" id="stopP">--</div></div>
+            <div class="pit"><h4>🎯 目標一 +4%</h4><div class="pv" id="tp1">--</div></div>
+            <div class="pit"><h4>🎯 目標二 +8%</h4><div class="pv" id="tp2">--</div></div>
+        </div>
+        <div class="sig-note">盈利達 +4% 後將止損移至成本價 · 單筆風險 ≤ 總資金 2%</div>
+    </div>
+
+    <!-- Waiting Box -->
+    <div class="wait-box" id="waitBox">
+        <div class="big-n zero" id="bigN">0/5</div>
+        <div class="wait-sub">條件尚未全部達成，繼續等待訊號...</div>
+        <div class="badges" id="badges"></div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- Filter Details -->
+    <div class="sec-hdr">
+        <span class="sec-t">🔍 5重過濾條件詳情</span>
+    </div>
+    <div class="fgrid">
+        <div class="fc" id="fc1">
+            <div class="fhdr"><span class="fnm">① 大趨勢</span><span class="dot" id="d1"></span></div>
+            <div class="fv" id="fv1">--</div>
+            <div class="fd">QQQ &gt; 200日SMA +5%緩衝</div>
+        </div>
+        <div class="fc" id="fc2">
+            <div class="fhdr"><span class="fnm">② MACD動量</span><span class="dot" id="d2"></span></div>
+            <div class="fv" id="fv2">--</div>
+            <div class="fd">EMA12 &gt; EMA26 上升趨勢</div>
+        </div>
+        <div class="fc" id="fc3">
+            <div class="fhdr"><span class="fnm">③ RSI超賣</span><span class="dot" id="d3"></span></div>
+            <div class="fv" id="fv3">--</div>
+            <div class="fd">RSI(14) &lt; 40 超賣回彈</div>
+        </div>
+        <div class="fc" id="fc4">
+            <div class="fhdr"><span class="fnm">④ EMA排列</span><span class="dot" id="d4"></span></div>
+            <div class="fv" id="fv4">--</div>
+            <div class="fd">EMA10 &gt; EMA50 短期强勢</div>
+        </div>
+        <div class="fc" id="fc5">
+            <div class="fhdr"><span class="fnm">⑤ 成交量</span><span class="dot" id="d5"></span></div>
+            <div class="fv" id="fv5">--</div>
+            <div class="fd">Vol &gt; 20日均量 ×1.2</div>
+        </div>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="brow">
+        <button class="btn" id="refreshBtn" onclick="go()">🔄 立即檢查</button>
+        <button class="btn out" onclick="enableNotif()">🔔 啟用通知</button>
+    </div>
+
+    <!-- Info Bar -->
+    <div class="info-bar">
+        🕐 上次更新：<b id="lastUp">尚未更新</b><br>
+        ⏱ 下次自動更新：<b id="nextUp">--</b><br>
+        📡 數據：Yahoo Finance（多線路自動切換 · 智能重試）
+    </div>
+
+</div><!-- /wrap -->
+
+<script>
+// ── Service Worker ──
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js')
+        .then(() => console.log('SW registered'))
+        .catch(e => console.warn('SW error:', e));
+}
+
+// ── PWA Install ──
+let deferredPrompt = null;
+window.addEventListener('beforeinstallprompt', e => {
+    e.preventDefault();
+    deferredPrompt = e;
+    document.getElementById('installBanner').classList.add('show');
+});
+document.getElementById('installBtn').addEventListener('click', async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    deferredPrompt = null;
+    if (outcome === 'accepted') document.getElementById('installBanner').classList.remove('show');
+});
+window.addEventListener('appinstalled', () => {
+    document.getElementById('installBanner').classList.remove('show');
+});
+
+// ═══════════════════════════════════════════════════
+// Yahoo Finance 數據獲取（2025 最新修復版）
+//
+// 策略（按優先順序）：
+// 1. 本地代理 API（/api/chart/）— 最可靠，無 CORS 問題
+// 2. allorigins.win — 免費公共 proxy，帶智能重試
+// 3. codetabs.com — 備用 proxy
+// ═══════════════════════════════════════════════════
+
+// 偵測本地代理 API 是否可用
+let LOCAL_API = null; // 將在首次請求時偵測
+
+async function detectLocalApi() {
+    if (LOCAL_API !== null) return LOCAL_API;
+    try {
+        const ctrl = new AbortController();
+        setTimeout(() => ctrl.abort(), 3000);
+        const r = await fetch('/api/health', { signal: ctrl.signal, cache: 'no-store' });
+        if (r.ok) {
+            LOCAL_API = true;
+            console.log('✅ Local proxy API available');
+            return true;
+        }
+    } catch (e) { /* ignore */ }
+    LOCAL_API = false;
+    console.log('ℹ️ Local proxy API not available, using public proxies');
+    return false;
+}
+
+// 帶超時的 fetch
+async function fetchWithTimeout(url, timeoutMs = 12000) {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+    try {
+        const r = await fetch(url, {
+            signal: ctrl.signal,
+            cache: 'no-store',
+            headers: { 'Accept': 'application/json, text/plain, */*' }
+        });
+        clearTimeout(timer);
+        return r;
+    } catch (e) {
+        clearTimeout(timer);
+        throw e;
+    }
+}
+
+// 驗證 Yahoo Finance 返回數據
+function validateYFResult(json, ticker, minPoints = 20) {
+    const result = json?.chart?.result?.[0];
+    if (!result) return null;
+    const closes = result.indicators?.quote?.[0]?.close?.filter(v => v != null) || [];
+    if (closes.length < minPoints) {
+        console.warn(`Insufficient data for ${ticker}: ${closes.length} points`);
+        return null;
+    }
+    return result;
+}
+
+// 主要數據獲取函數（帶智能重試）
+async function fetchYahoo(ticker, range) {
+    const retryEl = document.getElementById('retryStatus');
+    const hasLocal = await detectLocalApi();
+
+    // ── 方案一：本地代理 API ──
+    if (hasLocal) {
+        try {
+            const r = await fetchWithTimeout(`/api/chart/${ticker}?range=${range}&interval=1d`, 12000);
+            if (r.ok) {
+                const json = await r.json();
+                const result = validateYFResult(json, ticker);
+                if (result) {
+                    console.log(`✅ ${ticker} via local API, price=${result.meta?.regularMarketPrice}`);
+                    return result;
+                }
+            }
+        } catch (e) {
+            console.warn(`Local API failed for ${ticker}:`, e.message);
+        }
+    }
+
+    // ── 方案二：公共 CORS Proxy（帶重試）──
+    const YF_URLS = [
+        `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=${range}&includePrePost=false`,
+        `https://query2.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=${range}&includePrePost=false`,
+    ];
+
+    const MAX_ATTEMPTS = 6;
+    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+        const ts = Date.now();
+        const yUrl = YF_URLS[attempt % YF_URLS.length];
+        const enc = encodeURIComponent(yUrl);
+
+        // 輪流使用不同 proxy 策略
+        const proxyStrategies = [
+            `https://api.allorigins.win/raw?url=${enc}`,
+            `https://api.allorigins.win/raw?url=${enc}&_=${ts}`,
+            `https://api.codetabs.com/v1/proxy/?quest=${enc}`,
+            `https://api.allorigins.win/raw?url=${encodeURIComponent(yUrl + '&_=' + ts)}`,
+            `https://api.allorigins.win/raw?url=${enc}&cb=${ts}`,
+            `https://api.codetabs.com/v1/proxy/?quest=${encodeURIComponent(yUrl + '&t=' + ts)}`,
+        ];
+        const proxyUrl = proxyStrategies[attempt];
+
+        try {
+            if (attempt > 0) {
+                retryEl.className = 'retry-status show';
+                retryEl.textContent = `🔄 第 ${attempt + 1} 次嘗試（${ticker}）...`;
+                await new Promise(r => setTimeout(r, Math.min(800 * attempt, 3000)));
+            }
+
+            const resp = await fetchWithTimeout(proxyUrl, 12000);
+            if (!resp.ok) { console.warn(`Attempt ${attempt + 1} HTTP ${resp.status}`); continue; }
+
+            const text = await resp.text();
+            if (!text || text.length < 50) { console.warn(`Attempt ${attempt + 1} empty response`); continue; }
+
+            let json;
+            try { json = JSON.parse(text); } catch (e) { console.warn(`Attempt ${attempt + 1} JSON parse fail`); continue; }
+
+            const result = validateYFResult(json, ticker);
+            if (result) {
+                retryEl.className = 'retry-status';
+                console.log(`✅ ${ticker} via proxy attempt ${attempt + 1}, price=${result.meta?.regularMarketPrice}`);
+                return result;
+            }
+        } catch (e) {
+            console.warn(`Attempt ${attempt + 1} failed for ${ticker}:`, e.message || e);
+        }
+    }
+
+    retryEl.className = 'retry-status';
+    return null;
+}
+
+// ── Technical Indicators ──
+function sma(arr, n) {
+    if (!arr || arr.length < n) return null;
+    return arr.slice(0, n).reduce((s, v) => s + v, 0) / n;
+}
+
+function ema(arr, n) {
+    if (!arr || arr.length < n) return null;
+    const d = [...arr].reverse(); // oldest → newest
+    const k = 2 / (n + 1);
+    let e = d.slice(0, n).reduce((s, v) => s + v, 0) / n;
+    for (let i = n; i < d.length; i++) e = d[i] * k + e * (1 - k);
+    return e;
+}
+
+function rsi(arr, n = 14) {
+    if (!arr || arr.length < n + 1) return null;
+    let g = 0, l = 0;
+    for (let i = 0; i < n; i++) {
+        const d = arr[i] - arr[i + 1]; // newest first
+        if (d > 0) g += d; else l -= d;
+    }
+    const ag = g / n, al = l / n;
+    return al === 0 ? 100 : 100 - 100 / (1 + ag / al);
+}
+
+function atr(hi, lo, cl, n = 14) {
+    if (!hi || hi.length < n + 1) return null;
+    const trs = [];
+    for (let i = 0; i < n; i++) {
+        const p = cl[i + 1] ?? cl[i];
+        trs.push(Math.max(hi[i] - lo[i], Math.abs(hi[i] - p), Math.abs(lo[i] - p)));
+    }
+    return trs.reduce((s, v) => s + v, 0) / n;
+}
+
+// ── UI Helpers ──
+const $ = id => document.getElementById(id);
+
+function setFilter(n, pass, txt) {
+    const labels = ['大趨勢', 'MACD動量', 'RSI超賣', 'EMA排列', '成交量'];
+    $(`fc${n}`).className = 'fc' + (pass ? ' pass' : '');
+    $(`d${n}`).className = 'dot' + (pass ? ' on' : '');
+    const v = $(`fv${n}`);
+    v.className = 'fv ' + (pass ? 'ok' : 'no');
+    v.textContent = (pass ? '✅ ' : '❌ ') + txt;
+    return { label: labels[n - 1], pass };
+}
+
+// ── Countdown Timer ──
+let timer = null;
+function startCD(mins = 30) {
+    clearInterval(timer);
+    let s = mins * 60;
+    timer = setInterval(() => {
+        s--;
+        if (s <= 0) { clearInterval(timer); go(); return; }
+        const m = String(Math.floor(s / 60)).padStart(2, '0');
+        const sec = String(s % 60).padStart(2, '0');
+        $('nextUp').textContent = `${m}:${sec}`;
+        $('pBar').style.width = `${((mins * 60 - s) / (mins * 60)) * 100}%`;
+    }, 1000);
+}
+
+// ── Notifications ──
+async function enableNotif() {
+    if (!('Notification' in window)) { alert('此瀏覽器不支援通知'); return; }
+    const p = await Notification.requestPermission();
+    if (p === 'granted') {
+        new Notification('✅ TQQQ 監測器已啟動', { body: '訊號觸發時即時通知你！' });
+    } else {
+        alert('通知被拒絕。請到 Chrome → 設定 → 網站設定 → 通知 → 允許');
+    }
+}
+
+function push(entry, stop, tp1) {
+    if (Notification.permission === 'granted') {
+        new Notification('🚀 TQQQ 買入訊號觸發！', {
+            body: `買入 $${entry}  止損 $${stop}  目標 $${tp1}`,
+            requireInteraction: true,
+        });
+    }
+}
+
+// ── Main Logic ──
+async function go() {
+    $('errBox').style.display = 'none';
+    const btn = $('refreshBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spin"></span>獲取中...';
+    $('pLabel').textContent = '📡 連接數據源...';
+    $('pBar').style.width = '5%';
+
+    try {
+        $('pLabel').textContent = '📡 連接 Yahoo Finance（自動選擇最快線路）...';
+        $('pBar').style.width = '10%';
+
+        // 並行獲取 TQQQ 和 QQQ 數據
+        const [tqR, qqR] = await Promise.all([
+            fetchYahoo('TQQQ', '3mo'),
+            fetchYahoo('QQQ', '1y')
+        ]);
+
+        if (!tqR || !qqR) {
+            const eb = $('errBox');
+            eb.style.display = 'block';
+            eb.innerHTML = `❌ 無法獲取數據（已嘗試多個線路）<br>
+<b>可能原因：</b><br>
+• 網絡連接不穩定，請檢查 WiFi / 流動數據<br>
+• 代理服務暫時超載，請 5-10 分鐘後重試<br>
+• 美股休市時段數據更新較慢<br>
+<b>建議：</b>點擊「立即檢查」重試`;
+            $('pLabel').textContent = '❌ 數據獲取失敗，請稍後重試';
+            btn.disabled = false;
+            btn.textContent = '🔄 立即檢查';
+            return;
+        }
+
+        $('pBar').style.width = '60%';
+        $('pLabel').textContent = '⚙️ 計算技術指標...';
+
+        // ── TQQQ Data ──
+        const tqQ = tqR.indicators.quote[0];
+        const tqCl = tqQ.close.filter(v => v != null).reverse();
+        const tqHi = tqQ.high.filter(v => v != null).reverse();
+        const tqLo = tqQ.low.filter(v => v != null).reverse();
+        const tqPr = tqR.meta.regularMarketPrice ?? tqCl[0];
+        const tqPrev = tqCl[1] ?? tqCl[0];
+        const tqChg = ((tqPr - tqPrev) / tqPrev * 100).toFixed(2);
+
+        // ── QQQ Data ──
+        const qqQ = qqR.indicators.quote[0];
+        const qqCl = qqQ.close.filter(v => v != null).reverse();
+        const qqVo = qqQ.volume.filter(v => v != null).reverse();
+        const qqPr = qqR.meta.regularMarketPrice ?? qqCl[0];
+        const qqPrev = qqCl[1] ?? qqCl[0];
+        const qqChg = ((qqPr - qqPrev) / qqPrev * 100).toFixed(2);
+
+        // ── Update Price Cards ──
+        $('tqqqPrice').textContent = `$${Number(tqPr).toFixed(2)}`;
+        $('tqqqPrice').className = 'sval ' + (tqChg >= 0 ? 'up' : 'dn');
+        $('tqqqChg').textContent = `${tqChg >= 0 ? '▲' : '▼'} ${Math.abs(tqChg)}%`;
+        $('tqqqChg').style.color = tqChg >= 0 ? 'var(--green)' : 'var(--red)';
+        $('sc-tqqq').classList.add('active');
+
+        $('qqqPrice').textContent = `$${Number(qqPr).toFixed(2)}`;
+        $('qqqPrice').className = 'sval ' + (qqChg >= 0 ? 'up' : 'dn');
+        $('qqqChg').textContent = `${qqChg >= 0 ? '▲' : '▼'} ${Math.abs(qqChg)}%`;
+        $('qqqChg').style.color = qqChg >= 0 ? 'var(--green)' : 'var(--red)';
+        $('sc-qqq').classList.add('active');
+
+        // ── Calculate Indicators ──
+        const s200 = sma(qqCl, 200);
+        const e12 = ema(qqCl, 12);
+        const e26 = ema(qqCl, 26);
+        const e10 = ema(qqCl, 10);
+        const e50 = ema(qqCl, 50);
+        const r14 = rsi(qqCl, 14);
+        const avgV = sma(qqVo, 20);
+        const curV = qqVo[0];
+        const tqATR = atr(tqHi.slice(0, 15), tqLo.slice(0, 15), tqCl.slice(0, 16), 14);
+
+        // ── Evaluate Filters ──
+        const f1p = s200 != null && qqPr > s200 * 1.05;
+        const f2p = e12 != null && e26 != null && e12 > e26;
+        const f3p = r14 != null && r14 < 40;
+        const f4p = e10 != null && e50 != null && e10 > e50;
+        const f5p = avgV != null && curV > avgV * 1.2;
+
+        const r1 = setFilter(1, f1p, s200 ? `QQQ $${qqPr.toFixed(1)} / SMA200 $${s200.toFixed(1)}` : '數據不足');
+        const r2 = setFilter(2, f2p, e12 && e26 ? `EMA12 ${e12.toFixed(1)} / EMA26 ${e26.toFixed(1)}` : '數據不足');
+        const r3 = setFilter(3, f3p, r14 != null ? `RSI(14) = ${r14.toFixed(1)}` : '數據不足');
+        const r4 = setFilter(4, f4p, e10 && e50 ? `EMA10 ${e10.toFixed(1)} / EMA50 ${e50.toFixed(1)}` : '數據不足');
+        const r5 = setFilter(5, f5p, avgV ? `${(curV / 1e6).toFixed(1)}M / 均 ${(avgV / 1e6).toFixed(1)}M` : '數據不足');
+
+        const passed = [f1p, f2p, f3p, f4p, f5p].filter(Boolean).length;
+        const all = passed === 5;
+
+        // ── Update Summary Cards ──
+        $('passCount').textContent = `${passed}/5`;
+        $('passCount').className = 'sval ' + (all ? 'up' : passed >= 3 ? 'up' : 'dn');
+        $('passSub').textContent = all ? '全部達成！' : `還差 ${5 - passed} 個`;
+        $('sc-pass').classList.toggle('active', all);
+
+        // ── Update Badges ──
+        $('badges').innerHTML = [r1, r2, r3, r4, r5]
+            .map(b => `<span class="bdg ${b.pass ? 'ok' : 'no'}">${b.pass ? '✅' : '❌'} ${b.label}</span>`)
+            .join('');
+        $('bigN').textContent = `${passed}/5`;
+        $('bigN').className = 'big-n' + (passed === 0 ? ' zero' : passed < 3 ? ' warn' : '');
+
+        // ── Signal / Wait Display ──
+        if (all) {
+            $('sigStatus').textContent = '✅ 買入！';
+            $('sigStatus').className = 'sval up';
+            $('sigSub').textContent = '立即行動';
+            $('sc-sig').classList.add('active');
+            $('sigBox').className = 'sig-box show fade-in';
+            $('waitBox').style.display = 'none';
+
+            const entry = Number(tqPr).toFixed(2);
+            const stop = tqATR ? (tqPr - tqATR * 2).toFixed(2) : 'N/A';
+            const t1 = (tqPr * 1.04).toFixed(2);
+            const t2 = (tqPr * 1.08).toFixed(2);
+            $('buyP').textContent = `$${entry}`;
+            $('stopP').textContent = `$${stop}`;
+            $('tp1').textContent = `$${t1}`;
+            $('tp2').textContent = `$${t2}`;
+            push(entry, stop, t1);
+        } else {
+            $('sigStatus').textContent = '⏳ 等待';
+            $('sigStatus').className = 'sval';
+            $('sigSub').textContent = `${passed}/5 條件`;
+            $('sigBox').className = 'sig-box';
+            $('waitBox').style.display = 'block';
+        }
+
+        // ── Update Footer ──
+        const now = new Date();
+        $('lastUp').textContent = now.toLocaleTimeString('zh-HK');
+        $('pBar').style.width = '100%';
+        $('pLabel').textContent = `✅ 已更新 ${now.toLocaleTimeString('zh-HK')} · 30分鐘後自動重新檢查`;
+        startCD(30);
+
+    } catch (e) {
+        const eb = $('errBox');
+        eb.style.display = 'block';
+        eb.innerHTML = '❌ 發生錯誤：' + e.message;
+        $('pLabel').textContent = '發生錯誤，請稍後重試';
+        console.error(e);
+    }
+
+    btn.disabled = false;
+    btn.textContent = '🔄 立即檢查';
+}
+
+// ── Auto-start ──
+go();
+</script>
+</body>
+</html>

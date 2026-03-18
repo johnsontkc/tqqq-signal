@@ -1,0 +1,28 @@
+<svg fill="none" viewBox="0 0 512 512" height="512" width="512" xmlns="http://www.w3.org/2000/svg">
+  
+  <rect fill="#0f172a" rx="128" height="512" width="512"></rect>
+
+  
+  <rect stroke-width="26" stroke="#22c55e" fill="#1e293b" rx="28" height="276" width="360" y="118" x="76"></rect>
+
+  
+  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="26" stroke="#22c55e" fill="none" d="M112 312 
+       L168 242 
+       L224 255 
+       L280 172 
+       L336 185 
+       L392 98"></path>
+
+  
+  <circle fill="#4ade80" r="13" cy="312" cx="112"></circle>
+  <circle fill="#4ade80" r="13" cy="242" cx="168"></circle>
+  <circle fill="#4ade80" r="13" cy="255" cx="224"></circle>
+  <circle fill="#4ade80" r="13" cy="172" cx="280"></circle>
+  <circle fill="#4ade80" r="13" cy="185" cx="336"></circle>
+  <circle fill="#4ade80" r="13" cy="98" cx="392"></circle>
+
+  
+  <text fill="#93c5fd" letter-spacing="-3px" font-weight="900" font-size="58" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Arial Black, sans-serif" text-anchor="middle" y="445" x="256">
+    TQQQ
+  </text>
+</svg>
