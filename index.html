@@ -457,9 +457,26 @@ function validateYFResult(json, ticker, minPoints = 20) {
 }
 
 async function fetchYahoo(ticker, range) {
-    const proxyUrl = `/.netlify/functions/yahoo-proxy?ticker=${ticker}&range=${range}`;
-    const resp = await fetchWithTimeout(proxyUrl, 10000);
-    
+    try {
+        const proxyUrl = `/.netlify/functions/yahoo-proxy?ticker=${ticker}&range=${range}`;
+        const resp = await fetchWithTimeout(proxyUrl, 10000);
+        
+        if (!resp.ok) {
+            console.error(`Proxy error: ${resp.status}`);
+            return null;
+        }
+
+        const json = await resp.json();
+        // 使用你原本就有的驗證邏輯
+        const result = validateYFResult(json, ticker);
+        if (result) {
+            console.log(`✅ ${ticker} 數據獲取成功`);
+            return result;
+        }
+    } catch (e) {
+        console.error(`Fetch error for ${ticker}:`, e);
+    }
+    return null;
 }
 
 // ── Technical Indicators ──
