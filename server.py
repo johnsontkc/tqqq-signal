@@ -109,8 +109,6 @@ def add_cors(response):
 
 
 if __name__ == '__main__':
-    # print('🚀 TQQQ Signal Proxy Server starting on http://localhost:8090')
-    # app.run(host='0.0.0.0', port=8090, debug=False, threaded=True)
     port = int(os.environ.get('PORT', 8090))
     print(f'🚀 TQQQ Signal Proxy Server starting on http://0.0.0.0:{port}')
     app.run(host='0.0.0.0', port=port, debug=False, threaded=True)
