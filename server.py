@@ -6,10 +6,15 @@ TQQQ Signal App - Yahoo Finance Proxy Server
 
 from flask import Flask, jsonify, request
 import urllib.request
+import os
 import urllib.parse
+import os
 import json
+import os
 import http.cookiejar
+import os
 import threading
+import os
 import time
 import os
 app = Flask(__name__, static_folder='.', static_url_path='')
